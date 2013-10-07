@@ -21,31 +21,31 @@ import (
 	"time"
 )
 
-type AuthorizationRequest struct {
-	Id           string
-	IssueInstant string
-	Settings     AppSettings
-	Base64       int
-}
-
 func NewAuthorizationRequest(appSettings AppSettings, accountSettings AccountSettings) *AuthorizationRequest {
 	myIdUUID, err := uuid.NewV4()
 	if err != nil {
 		fmt.Println("Error is UUID Generation:", err)
 	}
+	//yyyy-MM-dd'T'H:mm:ss
 	layout := "2006-01-02T15:04:05"
-	t, err := time.Parse(layout, time.Now().String())
-	return &AuthorizationRequest{Settings: appSettings, Id: "_" + myIdUUID.String(), IssueInstant: t.String()}
+	t := time.Now().Format(layout)
+
+	return &AuthorizationRequest{Settings: appSettings, Id: "_" + myIdUUID.String(), IssueInstant: t}
 }
 
+// GetRequest returns a string formatted XML document that represents the SAML document
+// TODO: parameterize more parts of the request
 func (ar AuthorizationRequest) GetRequest() (string, error) {
 	d := AuthnRequest{
 		XMLName: xml.Name{
 			Local: "samlp:AuthnRequest",
 		},
-		SAMLP: "urn:oasis:names:tc:SAML:2.0:protocol",
-		SAML:  "urn:oasis:names:tc:SAML:2.0:assertion",
-		ID:    ar.Id,
+		SAMLP:                       "urn:oasis:names:tc:SAML:2.0:protocol",
+		SAML:                        "urn:oasis:names:tc:SAML:2.0:assertion",
+		ID:                          ar.Id,
+		ProtocolBinding:             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+		Version:                     "2.0",
+		AssertionConsumerServiceURL: ar.Settings.AssertionConsumerServiceURL,
 		Issuer: Issuer{XMLName: xml.Name{
 			Local: "saml:Issuer",
 		}, Url: "https://sp.example.com/SAML2"},
@@ -54,19 +54,22 @@ func (ar AuthorizationRequest) GetRequest() (string, error) {
 			XMLName: xml.Name{
 				Local: "samlp:NameIDPolicy",
 			},
-			AllowCreate: false,
+			AllowCreate: true,
 			Format:      "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
 		},
 		RequestedAuthnContext: RequestedAuthnContext{
 			XMLName: xml.Name{
 				Local: "samlp:RequestedAuthnContext",
 			},
+			SAMLP:      "urn:oasis:names:tc:SAML:2.0:protocol",
 			Comparison: "exact",
 		},
 		AuthnContextClassRef: AuthnContextClassRef{
 			XMLName: xml.Name{
 				Local: "saml:AuthnContextClassRef",
 			},
+			SAML:      "urn:oasis:names:tc:SAML:2.0:assertion",
+			Transport: "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport",
 		},
 	}
 	b, err := xml.MarshalIndent(d, "", "    ")
@@ -74,6 +77,40 @@ func (ar AuthorizationRequest) GetRequest() (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+/*
+ <samlp:AuthnRequest
+    xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+    ID="aaf23196-1773-2113-474a-fe114412ab72"
+    Version="2.0"
+    IssueInstant="2004-12-05T09:21:59"
+    AssertionConsumerServiceIndex="0"
+    AttributeConsumingServiceIndex="0">
+    <saml:Issuer>https://sp.example.com/SAML2</saml:Issuer>
+    <samlp:NameIDPolicy
+      AllowCreate="true"
+      Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient"/>
+  </samlp:AuthnRequest>
+*/
+func main() {
+	appSettings := NewAppSettings("http://www.onelogin.net", "issuer")
+	accountSettings := NewAccountSettings("cert", "http://www.onelogin.net")
+	authRequest := NewAuthorizationRequest(*appSettings, *accountSettings)
+	saml, err := authRequest.GetRequest()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(saml)
+}
+
+type AuthorizationRequest struct {
+	Id           string
+	IssueInstant string
+	Settings     AppSettings
+	Base64       int
 }
 
 type AuthnRequest struct {
@@ -106,73 +143,30 @@ type NameIDPolicy struct {
 
 type RequestedAuthnContext struct {
 	XMLName    xml.Name
+	SAMLP      string `xml:"xmlns:samlp,attr"`
 	Comparison string `xml:"Comparison,attr"`
 }
 
 type AuthnContextClassRef struct {
-	XMLName xml.Name
+	XMLName   xml.Name
+	SAML      string `xml:"xmlns:saml,attr"`
+	Transport string `xml:",innerxml"`
 }
 
-func main() {
-	d := AuthnRequest{
-		XMLName: xml.Name{
-			Local: "samlp:AuthnRequest",
-		},
-
-		SAMLP: "urn:oasis:names:tc:SAML:2.0:protocol",
-		SAML:  "urn:oasis:names:tc:SAML:2.0:assertion",
-		Issuer: Issuer{XMLName: xml.Name{
-			Local: "saml:Issuer",
-		}, Url: "https://sp.example.com/SAML2"},
-		IssueInstant: "2004-12-05T09:21:59",
-		NameIDPolicy: NameIDPolicy{
-			XMLName: xml.Name{
-				Local: "samlp:NameIDPolicy",
-			},
-			AllowCreate: false,
-			Format:      "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
-		},
-		RequestedAuthnContext: RequestedAuthnContext{
-			XMLName: xml.Name{
-				Local: "samlp:RequestedAuthnContext",
-			},
-			Comparison: "exact",
-		},
-		AuthnContextClassRef: AuthnContextClassRef{
-			XMLName: xml.Name{
-				Local: "saml:AuthnContextClassRef",
-			},
-		},
-	}
-	b, err := xml.MarshalIndent(d, "", "    ")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(b))
-}
-
-/*
- <samlp:AuthnRequest
-    xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-    ID="aaf23196-1773-2113-474a-fe114412ab72"
-    Version="2.0"
-    IssueInstant="2004-12-05T09:21:59"
-    AssertionConsumerServiceIndex="0"
-    AttributeConsumingServiceIndex="0">
-    <saml:Issuer>https://sp.example.com/SAML2</saml:Issuer>
-    <samlp:NameIDPolicy
-      AllowCreate="true"
-      Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient"/>
-  </samlp:AuthnRequest>
-*/
 type AccountSettings struct {
 	Certificate        string
 	IDP_SSO_Target_URL string
 }
 
+func NewAccountSettings(cert string, targetUrl string) *AccountSettings {
+	return &AccountSettings{cert, targetUrl}
+}
+
 type AppSettings struct {
 	AssertionConsumerServiceURL string
 	Issuer                      string
+}
+
+func NewAppSettings(assertionServiceUrl string, issuer string) *AppSettings {
+	return &AppSettings{assertionServiceUrl, issuer}
 }
