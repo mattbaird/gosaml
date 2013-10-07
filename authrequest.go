@@ -15,9 +15,11 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"github.com/nu7hatch/gouuid"
+	"net/url"
 	"time"
 )
 
@@ -30,12 +32,12 @@ func NewAuthorizationRequest(appSettings AppSettings, accountSettings AccountSet
 	layout := "2006-01-02T15:04:05"
 	t := time.Now().Format(layout)
 
-	return &AuthorizationRequest{Settings: appSettings, Id: "_" + myIdUUID.String(), IssueInstant: t}
+	return &AuthorizationRequest{AccountSettings: accountSettings, AppSettings: appSettings, Id: "_" + myIdUUID.String(), IssueInstant: t}
 }
 
 // GetRequest returns a string formatted XML document that represents the SAML document
 // TODO: parameterize more parts of the request
-func (ar AuthorizationRequest) GetRequest() (string, error) {
+func (ar AuthorizationRequest) GetRequest(base64Encode bool) (string, error) {
 	d := AuthnRequest{
 		XMLName: xml.Name{
 			Local: "samlp:AuthnRequest",
@@ -45,7 +47,7 @@ func (ar AuthorizationRequest) GetRequest() (string, error) {
 		ID:                          ar.Id,
 		ProtocolBinding:             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
 		Version:                     "2.0",
-		AssertionConsumerServiceURL: ar.Settings.AssertionConsumerServiceURL,
+		AssertionConsumerServiceURL: ar.AppSettings.AssertionConsumerServiceURL,
 		Issuer: Issuer{XMLName: xml.Name{
 			Local: "saml:Issuer",
 		}, Url: "https://sp.example.com/SAML2"},
@@ -76,7 +78,27 @@ func (ar AuthorizationRequest) GetRequest() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	if base64Encode {
+		data := []byte(b)
+		return base64.StdEncoding.EncodeToString(data), nil
+	} else {
+		return string(b), nil
+	}
+}
+
+// String reqString = accSettings.getIdp_sso_target_url()+"?SAMLRequest=" +
+// AuthRequest.getRidOfCRLF(URLEncoder.encode(authReq.getRequest(AuthRequest.base64),"UTF-8"));
+func (ar AuthorizationRequest) GetRequestUrl() (string, error) {
+	u, err := url.Parse(ar.AccountSettings.IDP_SSO_Target_URL)
+	if err != nil {
+		return "", err
+	}
+	base64EncodedUTF8SamlRequest, err := ar.GetRequest(true)
+	if err != nil {
+		return "", err
+	}
+	u.Query().Add("SAMLRequest", base64EncodedUTF8SamlRequest)
+	return u.String(), nil
 }
 
 /*
@@ -98,7 +120,7 @@ func main() {
 	appSettings := NewAppSettings("http://www.onelogin.net", "issuer")
 	accountSettings := NewAccountSettings("cert", "http://www.onelogin.net")
 	authRequest := NewAuthorizationRequest(*appSettings, *accountSettings)
-	saml, err := authRequest.GetRequest()
+	saml, err := authRequest.GetRequest(false)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -107,10 +129,11 @@ func main() {
 }
 
 type AuthorizationRequest struct {
-	Id           string
-	IssueInstant string
-	Settings     AppSettings
-	Base64       int
+	Id              string
+	IssueInstant    string
+	AppSettings     AppSettings
+	AccountSettings AccountSettings
+	Base64          int
 }
 
 type AuthnRequest struct {
