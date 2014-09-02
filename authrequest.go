@@ -1,4 +1,4 @@
-// Copyright 2012 Matthew Baird
+// Copyright 2014 Matthew Baird
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package saml
 
 import (
 	"encoding/base64"
@@ -99,33 +99,6 @@ func (ar AuthorizationRequest) GetRequestUrl() (string, error) {
 	}
 	u.Query().Add("SAMLRequest", base64EncodedUTF8SamlRequest)
 	return u.String(), nil
-}
-
-/*
- <samlp:AuthnRequest
-    xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-    ID="aaf23196-1773-2113-474a-fe114412ab72"
-    Version="2.0"
-    IssueInstant="2004-12-05T09:21:59"
-    AssertionConsumerServiceIndex="0"
-    AttributeConsumingServiceIndex="0">
-    <saml:Issuer>https://sp.example.com/SAML2</saml:Issuer>
-    <samlp:NameIDPolicy
-      AllowCreate="true"
-      Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient"/>
-  </samlp:AuthnRequest>
-*/
-func main() {
-	appSettings := NewAppSettings("http://www.onelogin.net", "issuer")
-	accountSettings := NewAccountSettings("cert", "http://www.onelogin.net")
-	authRequest := NewAuthorizationRequest(*appSettings, *accountSettings)
-	saml, err := authRequest.GetRequest(false)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(saml)
 }
 
 type AuthorizationRequest struct {
