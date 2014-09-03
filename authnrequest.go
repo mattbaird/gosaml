@@ -169,11 +169,11 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert st
 						Local: "samlsig:Reference",
 					},
 					URI: "#" + ar.Id,
-					SamlsigTransforms: SamlsigTransforms{
+					Transforms: Transforms{
 						XMLName: xml.Name{
 							Local: "samlsig:Transforms",
 						},
-						Transform: SamlsigTransform{
+						Transform: Transform{
 							XMLName: xml.Name{
 								Local: "samlsig:Transform",
 							},
@@ -198,15 +198,15 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert st
 					Local: "samlsig:SignatureValue",
 				},
 			},
-			SamlsigKeyInfo: SamlsigKeyInfo{
+			KeyInfo: KeyInfo{
 				XMLName: xml.Name{
 					Local: "samlsig:KeyInfo",
 				},
-				X509Data: SamlsigX509Data{
+				X509Data: X509Data{
 					XMLName: xml.Name{
 						Local: "samlsig:X509Data",
 					},
-					X509Certificate: SamlsigX509Certificate {
+					X509Certificate: X509Certificate {
 						XMLName: xml.Name{
 							Local: "samlsig:X509Certificate",
 						},

@@ -90,7 +90,7 @@ type Signature struct {
     Id             string         `xml:"Id,attr"`
     SignedInfo     SignedInfo     `xml:",innerxml"`
     SignatureValue SignatureValue `xml:",innerxml"`
-    SamlsigKeyInfo SamlsigKeyInfo `xml:",innerxml"`
+    KeyInfo        KeyInfo        `xml:",innerxml"`
 }
 
 type SignedInfo struct {
@@ -104,9 +104,9 @@ type SignatureValue struct {
     XMLName xml.Name
 }
 
-type SamlsigKeyInfo struct {
+type KeyInfo struct {
     XMLName  xml.Name
-    X509Data SamlsigX509Data `xml:",innerxml"`
+    X509Data X509Data `xml:",innerxml"`
 }
 
 type CanonicalizationMethod struct {
@@ -120,21 +120,21 @@ type SignatureMethod struct {
 }
 
 type SamlsigReference struct {
-    XMLName           xml.Name
-    URI               string            `xml:"URI,attr"`
-    SamlsigTransforms SamlsigTransforms `xml:",innerxml"`
-    DigestMethod      DigestMethod      `xml:",innerxml"`
-    DigestValue       DigestValue       `xml:",innerxml"`
+    XMLName      xml.Name
+    URI          string       `xml:"URI,attr"`
+    Transforms   Transforms   `xml:",innerxml"`
+    DigestMethod DigestMethod `xml:",innerxml"`
+    DigestValue  DigestValue  `xml:",innerxml"`
 }
 
-type SamlsigX509Data struct {
+type X509Data struct {
     XMLName         xml.Name
-    X509Certificate SamlsigX509Certificate `xml:",innerxml"`
+    X509Certificate X509Certificate `xml:",innerxml"`
 }
 
-type SamlsigTransforms struct {
+type Transforms struct {
     XMLName   xml.Name
-    Transform SamlsigTransform
+    Transform Transform
 }
 
 type DigestMethod struct {
@@ -146,12 +146,12 @@ type DigestValue struct {
     XMLName xml.Name
 }
 
-type SamlsigX509Certificate struct {
+type X509Certificate struct {
     XMLName xml.Name
     Cert    string   `xml:",innerxml"`
 }
 
-type SamlsigTransform struct {
+type Transform struct {
     XMLName   xml.Name
     Algorithm string   `xml:"Algorithm,attr"`
 }
