@@ -1,4 +1,4 @@
-// Copyright 2014 Matthew Baird
+// Copyright 2014 Matthew Baird, Andrew Mussey
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"net/url"
 	"time"
+	"io/ioutil"
+	"os/exec"
+	"os"
+	"strings"
 )
 
 func NewAuthorizationRequest(appSettings AppSettings, accountSettings AccountSettings) *AuthorizationRequest {
@@ -48,9 +52,12 @@ func (ar AuthorizationRequest) GetRequest(base64Encode bool) (string, error) {
 		ProtocolBinding:             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
 		Version:                     "2.0",
 		AssertionConsumerServiceURL: ar.AppSettings.AssertionConsumerServiceURL,
-		Issuer: Issuer{XMLName: xml.Name{
-			Local: "saml:Issuer",
-		}, Url: "https://sp.example.com/SAML2"},
+		Issuer: Issuer{
+			XMLName: xml.Name{
+				Local: "saml:Issuer",
+			},
+			Url: "https://sp.example.com/SAML2",
+		},
 		IssueInstant: ar.IssueInstant,
 		NameIDPolicy: NameIDPolicy{
 			XMLName: xml.Name{
@@ -78,17 +85,25 @@ func (ar AuthorizationRequest) GetRequest(base64Encode bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	xmlAuthnRequest := fmt.Sprintf("<?xml version='1.0' encoding='UTF-8'?>\n%s", b)
+
 	if base64Encode {
-		data := []byte(b)
+		data := []byte(xmlAuthnRequest)
 		return base64.StdEncoding.EncodeToString(data), nil
 	} else {
-		return string(b), nil
+		return string(xmlAuthnRequest), nil
 	}
 }
 
 // GetSignedRequest returns a string formatted XML document that represents the SAML document
 // TODO: parameterize more parts of the request
-func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool) (string, error) {
+func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert string, privateCert string) (string, error) {
+	cert, err := LoadCertificate(publicCert)
+	if err != nil {
+		return "", err
+	}
+
 	d := AuthnSignedRequest{
 		XMLName: xml.Name{
 			Local: "samlp:AuthnRequest",
@@ -100,9 +115,12 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool) (string, erro
 		ProtocolBinding:             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
 		Version:                     "2.0",
 		AssertionConsumerServiceURL: ar.AppSettings.AssertionConsumerServiceURL,
-		Issuer: Issuer{XMLName: xml.Name{
-			Local: "saml:Issuer",
-		}, Url: "https://sp.example.com/SAML2"},
+		Issuer: Issuer{
+			XMLName: xml.Name{
+				Local: "saml:Issuer",
+			},
+			Url: "https://sp.example.com/SAML2",
+		},
 		IssueInstant: ar.IssueInstant,
 		NameIDPolicy: NameIDPolicy{
 			XMLName: xml.Name{
@@ -166,6 +184,7 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool) (string, erro
 						XMLName: xml.Name{
 							Local: "samlsig:DigestMethod",
 						},
+						Algorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
 					},
 					DigestValue: DigestValue{
 						XMLName: xml.Name{
@@ -191,7 +210,7 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool) (string, erro
 						XMLName: xml.Name{
 							Local: "samlsig:X509Certificate",
 						},
-						Cert: "Cert Placeholder",
+						Cert: cert,
 					},
 				},
 			},
@@ -201,11 +220,43 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool) (string, erro
 	if err != nil {
 		return "", err
 	}
+
+	samlAuthnRequest := string(b)
+	// Write the SAML to a file.
+
+	samlXmlsecInput, err := ioutil.TempFile(os.TempDir(), "tmpgs")
+	if err != nil {
+		return "", err
+	}
+	samlXmlsecOutput, err := ioutil.TempFile(os.TempDir(), "tmpgs")
+	if err != nil {
+		return "", err
+	}
+
+	samlXmlsecOutput.Close()
+
+	samlXmlsecInput.WriteString("<?xml version='1.0' encoding='UTF-8'?>\n")
+	samlXmlsecInput.WriteString(samlAuthnRequest)
+	samlXmlsecInput.Close()
+
+	_, errOut := exec.Command("xmlsec1", "--sign", "--privkey-pem", privateCert,
+		"--id-attr:ID", "urn:oasis:names:tc:SAML:2.0:protocol:AuthnRequest",
+		"--output", samlXmlsecOutput.Name(), samlXmlsecInput.Name()).Output()
+    if errOut != nil {
+        return "", errOut
+    }
+
+	samlSignedRequest, err := ioutil.ReadFile(samlXmlsecOutput.Name())
+	if err != nil {
+		return "", err
+	}
+	samlSignedRequestXml := strings.Trim(string(samlSignedRequest), "\n")
+
 	if base64Encode {
-		data := []byte(b)
+		data := []byte(samlSignedRequestXml)
 		return base64.StdEncoding.EncodeToString(data), nil
 	} else {
-		return string(b), nil
+		return string(samlSignedRequestXml), nil
 	}
 }
 
@@ -224,156 +275,8 @@ func (ar AuthorizationRequest) GetRequestUrl() (string, error) {
 	return u.String(), nil
 }
 
-type AuthorizationRequest struct {
-	Id              string
-	IssueInstant    string
-	AppSettings     AppSettings
-	AccountSettings AccountSettings
-	Base64          int
-}
-
-type AuthnRequest struct {
-	XMLName                        xml.Name
-	SAMLP                          string                `xml:"xmlns:samlp,attr"`
-	SAML                           string                `xml:"xmlns:saml,attr"`
-	ID                             string                `xml:"ID,attr"`
-	Version                        string                `xml:"Version,attr"`
-	ProtocolBinding                string                `xml:"ProtocolBinding,attr"`
-	AssertionConsumerServiceURL    string                `xml:"AssertionConsumerServiceURL,attr"`
-	IssueInstant                   string                `xml:"IssueInstant,attr"`
-	AssertionConsumerServiceIndex  int                   `xml:"AssertionConsumerServiceIndex,attr"`
-	AttributeConsumingServiceIndex int                   `xml:"AttributeConsumingServiceIndex,attr"`
-	Issuer                         Issuer                `xml:"Issuer"`
-	NameIDPolicy                   NameIDPolicy          `xml:"NameIDPolicy"`
-	RequestedAuthnContext          RequestedAuthnContext `xml:"RequestedAuthnContext"`
-	AuthnContextClassRef           AuthnContextClassRef  `xml:"AuthnContextClassRef"`
-}
-
-type AuthnSignedRequest struct {
-	XMLName                        xml.Name
-	SAMLP                          string                `xml:"xmlns:samlp,attr"`
-	SAML                           string                `xml:"xmlns:saml,attr"`
-	SAMLSIG                        string                `xml:"xmlns:samlsig,attr"`
-	ID                             string                `xml:"ID,attr"`
-	Version                        string                `xml:"Version,attr"`
-	ProtocolBinding                string                `xml:"ProtocolBinding,attr"`
-	AssertionConsumerServiceURL    string                `xml:"AssertionConsumerServiceURL,attr"`
-	IssueInstant                   string                `xml:"IssueInstant,attr"`
-	AssertionConsumerServiceIndex  int                   `xml:"AssertionConsumerServiceIndex,attr"`
-	AttributeConsumingServiceIndex int                   `xml:"AttributeConsumingServiceIndex,attr"`
-	Issuer                         Issuer                `xml:"Issuer"`
-	NameIDPolicy                   NameIDPolicy          `xml:"NameIDPolicy"`
-	RequestedAuthnContext          RequestedAuthnContext `xml:"RequestedAuthnContext"`
-	AuthnContextClassRef           AuthnContextClassRef  `xml:"AuthnContextClassRef"`
-	Signature                      Signature             `xml:"Signature"`
-}
-
-type Issuer struct {
-	XMLName xml.Name
-	Url     string `xml:",innerxml"`
-}
-
-type NameIDPolicy struct {
-	XMLName     xml.Name
-	AllowCreate bool   `xml:"AllowCreate,attr"`
-	Format      string `xml:"Format,attr"`
-}
-
-type RequestedAuthnContext struct {
-	XMLName    xml.Name
-	SAMLP      string `xml:"xmlns:samlp,attr"`
-	Comparison string `xml:"Comparison,attr"`
-}
-
-type AuthnContextClassRef struct {
-	XMLName   xml.Name
-	SAML      string `xml:"xmlns:saml,attr"`
-	Transport string `xml:",innerxml"`
-}
-
-type Signature struct {
-	XMLName        xml.Name
-	Id             string         `xml:"Id,attr"`
-	SignedInfo     SignedInfo     `xml:",innerxml"`
-	SignatureValue SignatureValue `xml:",innerxml"`
-	SamlsigKeyInfo SamlsigKeyInfo `xml:",innerxml"`
-}
-
-type SignedInfo struct {
-	XMLName                xml.Name
-	CanonicalizationMethod CanonicalizationMethod `xml:",innerxml"`
-	SignatureMethod        SignatureMethod        `xml:",innerxml"`
-	SamlsigReference       SamlsigReference       `xml:",innerxml"`
-}
-
-type SignatureValue struct {
-	XMLName xml.Name
-}
-
-type SamlsigKeyInfo struct {
-	XMLName  xml.Name
-	X509Data SamlsigX509Data `xml:",innerxml"`
-}
-
-type CanonicalizationMethod struct {
-	XMLName   xml.Name
-	Algorithm string   `xml:"Algorithm,attr"`
-}
-
-type SignatureMethod struct {
-	XMLName   xml.Name
-	Algorithm string   `xml:"Algorithm,attr"`
-}
-
-type SamlsigReference struct {
-	XMLName           xml.Name
-	URI               string            `xml:"URI,attr"`
-	SamlsigTransforms SamlsigTransforms `xml:",innerxml"`
-	DigestMethod      DigestMethod      `xml:",innerxml"`
-	DigestValue       DigestValue       `xml:",innerxml"`
-}
-
-type SamlsigX509Data struct {
-	XMLName         xml.Name
-	X509Certificate SamlsigX509Certificate `xml:",innerxml"`
-}
-
-type SamlsigTransforms struct {
-	XMLName   xml.Name
-	Transform SamlsigTransform
-}
-
-type DigestMethod struct {
-	XMLName   xml.Name
-	Algorithm string   `xml:"Algorithm,attr"`
-}
-
-type DigestValue struct {
-	XMLName xml.Name
-}
-
-type SamlsigX509Certificate struct {
-	XMLName xml.Name
-	Cert    string   `xml:",innerxml"`
-}
-
-type SamlsigTransform struct {
-	XMLName   xml.Name
-	Algorithm string   `xml:"Algorithm,attr"`
-}
-
-type AccountSettings struct {
-	Certificate        string
-	IDP_SSO_Target_URL string
-}
-
 func NewAccountSettings(cert string, targetUrl string) *AccountSettings {
 	return &AccountSettings{cert, targetUrl}
-}
-
-type AppSettings struct {
-	AssertionConsumerServiceURL string
-	Issuer                      string
 }
 
 func NewAppSettings(assertionServiceUrl string, issuer string) *AppSettings {
