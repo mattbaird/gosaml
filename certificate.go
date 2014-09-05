@@ -1,4 +1,4 @@
-// Copyright 2014 Matthew Baird
+// Copyright 2014 Matthew Baird, Andrew Mussey
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,34 +15,22 @@
 package saml
 
 import (
-	"crypto/x509"
-	"encoding/pem"
-	"fmt"
-	"io"
-	"os"
+	"io/ioutil"
+	"strings"
+	"regexp"
 )
 
-func LoadCertificate(crtFile string) (*x509.Certificate, error) {
-	fi, err := os.Open(crtFile)
+func LoadCertificate(crtFile string) (string, error) {
+	crtByte, err := ioutil.ReadFile(crtFile)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	pemBytes := make([]byte, 1024)
-	n, err := fi.Read(pemBytes)
-	if n >= 1024 {
-		return nil, err
-	}
-	if err != io.EOF && err != nil {
-		return nil, err
-	}
-	block, pemrest := pem.Decode(pemBytes[:n])
-	if len(pemrest) > 0 {
-		fmt.Println("pem.Decode had trailing", pemrest)
-	}
-	certificate, err := x509.ParseCertificate(block.Bytes)
-	return certificate, err
-}
+	crtString := string(crtByte)
 
-func LoadCertificateFromBytes(cert []byte) (*x509.Certificate, error) {
-	return x509.ParseCertificate(cert)
+	re := regexp.MustCompile("---(.*)CERTIFICATE(.*)---")
+	crtString = re.ReplaceAllString(crtString, "")
+	crtString = strings.Trim(crtString, " \n")
+	crtString = strings.Replace(crtString, "\n", "", -1)
+
+	return crtString, err
 }
