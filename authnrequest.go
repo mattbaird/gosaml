@@ -271,7 +271,11 @@ func (ar AuthorizationRequest) GetRequestUrl() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	u.Query().Add("SAMLRequest", base64EncodedUTF8SamlRequest)
+
+	q := u.Query()
+	q.Add("SAMLRequest", base64EncodedUTF8SamlRequest)
+
+	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
 
