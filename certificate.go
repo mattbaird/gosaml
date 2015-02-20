@@ -16,8 +16,8 @@ package saml
 
 import (
 	"io/ioutil"
-	"strings"
 	"regexp"
+	"strings"
 )
 
 func LoadCertificate(crtFile string) (string, error) {

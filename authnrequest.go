@@ -19,12 +19,12 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/nu7hatch/gouuid"
-	"net/url"
-	"time"
 	"io/ioutil"
-	"os/exec"
+	"net/url"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 )
 
 func NewAuthorizationRequest(appSettings AppSettings, accountSettings AccountSettings) *AuthorizationRequest {
@@ -206,7 +206,7 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert st
 					XMLName: xml.Name{
 						Local: "samlsig:X509Data",
 					},
-					X509Certificate: X509Certificate {
+					X509Certificate: X509Certificate{
 						XMLName: xml.Name{
 							Local: "samlsig:X509Certificate",
 						},
@@ -242,9 +242,9 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert st
 	_, errOut := exec.Command("xmlsec1", "--sign", "--privkey-pem", privateCert,
 		"--id-attr:ID", "urn:oasis:names:tc:SAML:2.0:protocol:AuthnRequest",
 		"--output", samlXmlsecOutput.Name(), samlXmlsecInput.Name()).Output()
-    if errOut != nil {
-        return "", errOut
-    }
+	if errOut != nil {
+		return "", errOut
+	}
 
 	samlSignedRequest, err := ioutil.ReadFile(samlXmlsecOutput.Name())
 	if err != nil {
