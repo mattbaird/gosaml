@@ -56,7 +56,7 @@ func (ar AuthorizationRequest) GetRequest(base64Encode bool) (string, error) {
 			XMLName: xml.Name{
 				Local: "saml:Issuer",
 			},
-			Url: "https://sp.example.com/SAML2",
+			Url: ar.AppSettings.Issuer,
 		},
 		IssueInstant: ar.IssueInstant,
 		NameIDPolicy: NameIDPolicy{
@@ -120,7 +120,7 @@ func (ar AuthorizationRequest) GetSignedRequest(base64Encode bool, publicCert st
 			XMLName: xml.Name{
 				Local: "saml:Issuer",
 			},
-			Url: "https://sp.example.com/SAML2",
+			Url: ar.AppSettings.Issuer,
 		},
 		IssueInstant: ar.IssueInstant,
 		NameIDPolicy: NameIDPolicy{
