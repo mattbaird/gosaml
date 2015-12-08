@@ -33,14 +33,13 @@ type AuthnRequest struct {
 	ID                             string                `xml:"ID,attr"`
 	Version                        string                `xml:"Version,attr"`
 	ProtocolBinding                string                `xml:"ProtocolBinding,attr"`
-	AssertionConsumerServiceURL    string                `xml:"AssertionConsumerServiceURL,attr"`
+	AssertionConsumerServiceURL    string                `xml:"AssertionConsumerServiceURL,attr,omitempty"`
 	IssueInstant                   string                `xml:"IssueInstant,attr"`
-	AssertionConsumerServiceIndex  int                   `xml:"AssertionConsumerServiceIndex,attr"`
 	AttributeConsumingServiceIndex int                   `xml:"AttributeConsumingServiceIndex,attr"`
+	AssertionConsumerServiceIndex  int                   `xml:"AssertionConsumerServiceIndex,attr,omitempty"`
 	Issuer                         Issuer                `xml:"Issuer"`
 	NameIDPolicy                   NameIDPolicy          `xml:"NameIDPolicy"`
 	RequestedAuthnContext          RequestedAuthnContext `xml:"RequestedAuthnContext"`
-	AuthnContextClassRef           AuthnContextClassRef  `xml:"AuthnContextClassRef"`
 }
 
 type AuthnSignedRequest struct {
@@ -74,9 +73,10 @@ type NameIDPolicy struct {
 }
 
 type RequestedAuthnContext struct {
-	XMLName    xml.Name
-	SAMLP      string `xml:"xmlns:samlp,attr"`
-	Comparison string `xml:"Comparison,attr"`
+	XMLName              xml.Name
+	SAMLP                string               `xml:"xmlns:samlp,attr"`
+	Comparison           string               `xml:"Comparison,attr"`
+	AuthnContextClassRef AuthnContextClassRef `xml:"AuthnContextClassRef"`
 }
 
 type AuthnContextClassRef struct {
