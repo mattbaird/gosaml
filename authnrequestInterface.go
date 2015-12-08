@@ -40,7 +40,6 @@ type AuthnRequest struct {
 	Issuer                         Issuer                `xml:"Issuer"`
 	NameIDPolicy                   NameIDPolicy          `xml:"NameIDPolicy"`
 	RequestedAuthnContext          RequestedAuthnContext `xml:"RequestedAuthnContext"`
-	AuthnContextClassRef           AuthnContextClassRef  `xml:"AuthnContextClassRef"`
 }
 
 type AuthnSignedRequest struct {
@@ -74,9 +73,10 @@ type NameIDPolicy struct {
 }
 
 type RequestedAuthnContext struct {
-	XMLName    xml.Name
-	SAMLP      string `xml:"xmlns:samlp,attr"`
-	Comparison string `xml:"Comparison,attr"`
+	XMLName              xml.Name
+	SAMLP                string               `xml:"xmlns:samlp,attr"`
+	Comparison           string               `xml:"Comparison,attr"`
+	AuthnContextClassRef AuthnContextClassRef `xml:"AuthnContextClassRef"`
 }
 
 type AuthnContextClassRef struct {
