@@ -34,7 +34,7 @@ func NewAuthorizationRequest(appSettings AppSettings, accountSettings AccountSet
 	}
 	//yyyy-MM-dd'T'H:mm:ss
 	layout := "2006-01-02T15:04:05"
-	t := time.Now().Format(layout)
+	t := time.Now().UTC().Format(layout)
 
 	return &AuthorizationRequest{AccountSettings: accountSettings, AppSettings: appSettings, Id: "_" + myIdUUID.String(), IssueInstant: t}
 }
